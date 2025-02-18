@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="[TOC] 1. Traditional ASR&emsp;&emsp;根据语音特征帧序列 $O&#x3D;{o_1,o_2,…,o_T}$, 穷举所有可能的Token序列$W$，获得后验概率最大的序列$W^&#x3D;{w_1,w_2,…,w_n}$, 即$$W^&#x3D;{\arg\max}{W\in \mathscr{W}} P(W|O) \tag{1.1} $$&emsp;&emsp;我">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Hexo">
+<meta property="og:url" content="http://example.com/2025/02/18/transducer/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="[TOC] 1. Traditional ASR&emsp;&emsp;根据语音特征帧序列 $O&#x3D;{o_1,o_2,…,o_T}$, 穷举所有可能的Token序列$W$，获得后验概率最大的序列$W^&#x3D;{w_1,w_2,…,w_n}$, 即$$W^&#x3D;{\arg\max}{W\in \mathscr{W}} P(W|O) \tag{1.1} $$&emsp;&emsp;我">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/las.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/apple.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/apple_ctc.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/transducer.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/transducer2.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/greedy-search.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/transducer-graph.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/cat-align-1.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/cat-align-2.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/fastemit.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/fastemit1.png">
+<meta property="og:image" content="http://example.com/2025/02/18/transducer/src/fastemit2.png">
+<meta property="article:published_time" content="2025-02-18T07:22:02.138Z">
+<meta property="article:modified_time" content="2025-02-18T07:22:02.139Z">
+<meta property="article:author" content="John Doe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2025/02/18/transducer/src/las.png">
+
+<link rel="canonical" href="http://example.com/2025/02/18/transducer/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title> | Hexo</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Hexo</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/18/transducer/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Hexo">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2025-02-18 15:22:02" itemprop="dateCreated datePublished" datetime="2025-02-18T15:22:02+08:00">2025-02-18</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>[TOC]</p>
+<h2 id="1-Traditional-ASR"><a href="#1-Traditional-ASR" class="headerlink" title="1. Traditional ASR"></a>1. Traditional ASR</h2><p>&emsp;&emsp;根据语音特征帧序列 $O&#x3D;{o_1,o_2,…,o_T}$, 穷举所有可能的<em>Token</em>序列$W$，获得后验概率最大的序列$W^<em>&#x3D;{w_1,w_2,…,w_n}$, 即<br>$$W^</em>&#x3D;{\arg\max}<em>{W\in \mathscr{W}} P(W|O) \tag{1.1} $$<br>&emsp;&emsp;我们常用word或sub-word来作为token，此时$W$表示子序列或者词序列，$\mathscr{W}$表示所有可能的<em>Token</em>序列。<br>&emsp;&emsp;传统的ASR算法基于bayes法则，将后验概率的求解分解成先验概率和似然概率的形式，从而将ASR系统模块化，根据bayes公式<br>$$p(W|O)&#x3D;\frac {P(O|W)P(W)}{P(O)} \tag{1.2}$$<br>而求解最优$W$与$p(O)$无关，因此有<br>$$W^*&#x3D;\mathop{\arg\max}</em>{W\in \mathscr{W}} P(O|W)P(W)  \tag{1.3}$$<br>$$p(W)&#x3D;p(w_1)p(w_2|w_1)p(w_3|w_{1:2})…p(w_n|w_{1:n-1})  \tag{1.4}$$<br>&emsp;&emsp;似然概率$P(O|W)$的模型称为声学模型，先验概率$P(W)$则由语言模型建模。</p>
+<h2 id="2-End-to-End-ASR"><a href="#2-End-to-End-ASR" class="headerlink" title="2. End-to-End ASR"></a>2. End-to-End ASR</h2><ul>
+<li>端到端ASR算法直接求解后验概率<br>$$\begin{split} W^*&amp;&#x3D;\mathop{\arg\max}<em>{W\in \mathscr{W}} P(W|O) \<br>             &amp;&#x3D;\mathop{\arg\max}</em>{W\in \mathscr{W}} p(w_1|O)\cdot p(w_2|w_1,O)\cdot \cdot \cdot \cdot p(w_n|w_{1:n-1}, O) \<br>             &amp;&#x3D;\mathop{\arg\max}<em>{W\in \mathscr{W}}\prod</em>{n&#x3D;1}^{n} p(w_n|w_{1:n-1},O) \end{split}   \tag{2.1}$$</li>
+</ul>
+<p>即：序列整体的后验概率可以通过Token的后验概率累积得到。但这里也做了简化，假设当前Token $w_n$ 只依赖于之前出现的Token $w_{1:n-1}$。</p>
+<ul>
+<li>目前End2End语音识别算法有三类:<br> <strong>Listen-Attend-Spell (LAS)<br> Connectionist Temporal Classification (CTC)<br> Transducer</strong></li>
+</ul>
+<h3 id="2-1-LAS"><a href="#2-1-LAS" class="headerlink" title="2.1 LAS"></a>2.1 LAS</h3><blockquote>
+<p>Chan, W. , et al. “Listen, Attend and Spell.” Computer Science (2015).</p>
+</blockquote>
+<div align=center><img src="src/las.png" width=80%></div>
+
+<p>Encoder 用于提取音频的高层次特征<br>$$H&#x3D;Encoder(O)  \tag{2.2}$$<br>Decoder 有两种不同的模式，自回归（AutoRegressive）模式的根据高层特征和历史输出进行解码<br>$$\begin{split} w_n &amp;&#x3D;Decoder(w_{1:n-1}, H) \&amp;&#x3D;Decoder(w_{1:n-1}, Encoder(O)) \end{split}   \tag{2.3} \$$<br>自回归解码过程如下：<br>$$\begin{split} W^*&amp;&#x3D;\mathop{\arg\max}<em>{W\in \mathscr{W}} P(W|O) \<br>                   &amp;&#x3D;\mathop{\arg\max}</em>{W\in \mathscr{W}} p(w_1|O)\cdot p(w_2|w_1,O)\cdot \cdot \cdot \cdot p(w_N|w_{1:N-1}, O) \<br>                   &amp;&#x3D;\mathop{\arg\max}<em>{W\in \mathscr{W}}\prod</em>{n&#x3D;1}^{N} p(w_n|w_{1:n-1},O) \end{split}   \tag{2.4}$$</p>
+<p>非自回归（Non-AutoRegressive）的模型需要对 Encoder 的输出做进一步处理得到初步结果，Decoder 大多只作为一个纠错或重打分模块。</p>
+<p><strong>优点</strong>：真正意义上的端到端算法</p>
+<p><strong>缺点</strong>：效果差，无法流式; 没有利用audio和speech之间的单调性</p>
+<h3 id="2-2-CTC"><a href="#2-2-CTC" class="headerlink" title="2.2 CTC"></a>2.2 CTC</h3><blockquote>
+<p>Graves, A. . “Connectionist temporal classification : labelling unsegmented sequence data with recurrent neural networks.” Proc. Int. Conf. on Machine Learning, 2006.</p>
+</blockquote>
+<p>&emsp;&emsp;引入blank token实现帧级别<strong>软对齐</strong>，并且假设每一帧之间的token相互独立。<br>&emsp;&emsp;其中$B(\cdot )$是将软对齐序列转换为最终序列的操作，包含去除相邻重复 Token 和去除 blank，$B^{-1}(W)$是序列 $W$的所有可能的对齐序列，$\pi$是其中一个序列。举例说明$T&#x3D;8$<br>$$\begin{split} &amp;B(\pi^{1})&#x3D;B(ap-pl-ee)&#x3D;apple\<br>                &amp;B(\pi^{2})&#x3D;B(aa-p-ple)&#x3D;apple\<br>                &amp;B(\pi^{3})&#x3D;B(ap-ple–)&#x3D;apple\<br>                &amp;B(\pi^{4})&#x3D;B(aap–ple)&#x3D;apple\end{split}   $$</p>
+<div align="middle"><img src="src/apple.png" style="max-width:100%"></div>
+<div align="middle"><img src="src/apple_ctc.png" style="max-width:60%"></div>
+
+<p>$$\begin{split}  P(W|O) &#x3D; \sum_{\pi \in B^{-1}(W)}{p(\pi_1|O)p(\pi_2|O)…p(\pi_T|O)} \end{split}  \tag{2.5}$$</p>
+<blockquote>
+<p>复杂度高，$|V|^T$<br>能否用viterbi算法可以生成最可能的路径，然后使用交叉熵？不行，viterbi算法在没有探索的情况下，过早地提交路径或初始对齐，结果次优。</p>
+</blockquote>
+<p>训练：</p>
+<blockquote>
+<p><a target="_blank" rel="noopener" href="https://docs.google.com/presentation/d/12gYcPft9_4cxk2AD6Z6ZlJNa3wvZCW1ms31nhq51vMk/pub?start=false&loop=false&delayms=3000&slide=id.g24e9f0de4f_0_332">ctc loss 推导</a><br><a href="ctc.py">ctc.py</a></p>
+</blockquote>
+<p>解码：<br>上述是针对某一个已知序列$W$的后验概率，但是在解码的时候，$W$是待求解的未知量，求解的方法是先求最大概率的对齐序列$\pi^<em>$，再转换得到$W^</em>&#x3D;B(\pi^<em>)$。<br>$$\begin{split} \pi^</em>&amp;&#x3D;\mathop{\arg\max}<em>{\pi\in B^{-1}(\mathscr{W})} P(\pi|O) \ &amp;&#x3D; \mathop{\arg\max}</em>{\pi\in B^{-1}(\mathscr{W})} {p(\pi_1|O)p(\pi_2|O)…p(\pi_T|O)} \end{split}   \tag{2.6}$$</p>
+<p><strong>优点</strong>：训练简单，支持流式</p>
+<p><strong>缺点</strong>：收敛慢，输出长度必须小于输入音频的帧长度，输出之间相互独立</p>
+<h3 id="2-3-Transducer"><a href="#2-3-Transducer" class="headerlink" title="2.3 Transducer"></a>2.3 Transducer</h3><blockquote>
+<p>Graves, A. . “Sequence Transduction with Recurrent Neural Networks.” Computer Science 58.3(2012):235-242.<br><a href="transducer.py">transducer.py</a><br>Transducer，Encoder为RNN称为RNN-T，Encoder为Transformer称为Transformer-Transducer(T-T)</p>
+</blockquote>
+<div align="middle"><img src="src/transducer.png" style="max-width:50%"></div>
+
+<p>&emsp;&emsp;Transducer 引入了语言模型和一个 JointNet 用于融合声学和语言得分</p>
+<p>$$\begin{split}  &amp;f_t &#x3D; Encoder(o_{1:t}) \<br>                 &amp;g_u &#x3D; Predictor(w_{1:u-1}) \ \end{split}   \tag{2.7}$$<br>&emsp;&emsp;式中的$t$是解码过程中动态确定的，因为 Transducer 设计的解码算法中，一帧输入是可以对应多个输出的。式中每一个 Token 的后验概率计算过程为：先由 Encoder（声学模型）、PredictorNet（语言模型）独立计算得到声学特征和语言特征：<br>最后由 JointNet 融合两者得到最终结果<br>$$p(w_n|w_{1:n-1}, o_{1:t}) &#x3D; JointNet(f_t, g_n)  \tag{2.8}$$</p>
+<p>&emsp;&emsp;其解码过程的计算可以写作下式<br>$$\begin{split}  \pi^*&amp;&#x3D;\mathop{\arg\max}<em>{\pi\in B^{-1}(\mathscr{W})} P(\pi|O) \<br>                    &amp;&#x3D;\mathop{\arg\max}</em>{\pi\in B^{-1}(\mathscr{W})} p(\pi_1|o_1)\cdot p(\pi_2|\pi_1,o_{1:2})\cdot \cdot \cdot \cdot p(\pi_N|\pi_{1:N-1}, o_{1:T}) \<br>                    &amp;&#x3D;\mathop{\arg\max}<em>{\pi\in B^{-1}(\mathscr{W})}\prod</em>{n&#x3D;1}^{N} p(\pi_n|\pi_{1:n-1},o_{1:t}) \end{split}   \tag{2.9}$$</p>
+<p>Transducer 通过 PreditorNet 和 JointNet 引入了 Token 之间的相关性，可以看到，Transducer 的优化目标和 ASR 最初的目标是很接近的，这也是它优于 CTC-based Models 的内在原因。</p>
+<p><strong>优点</strong>：效果较好，支持流式，收敛快</p>
+<p><strong>缺点</strong>：难以训练，需要大量存储资源</p>
+<h4 id="2-3-1-transducer-forward-backward"><a href="#2-3-1-transducer-forward-backward" class="headerlink" title="2.3.1 transducer forward-backward"></a>2.3.1 transducer forward-backward</h4><div align=center><img src="src/transducer2.png" width=100%></div>
+
+
+<p>定义：<br>$$y(t,u)&#x3D;h(y_{u+1}|t,u) \tag{3.1}$$<br>$$\varnothing(t,u)&#x3D;h(\varnothing|t,u) \tag{3.2}$$</p>
+<ul>
+<li><strong>Forward:</strong><br>当$1\leq t\leq T, 0\leq u \leq U$<br>$$\begin{split} \alpha(t,u) &#x3D; \alpha(t-1,u)\varnothing(t-1,u) + \alpha(t,u-1)y(t,u-1) \end{split} \tag{3.3}$$<br>初始化$\alpha(1,0)&#x3D;1$,所有输出序列概率和为<br>$$Pr(y|x)&#x3D;\alpha(T,U)\varnothing(T,U)$$</li>
+<li><strong>backward:</strong><br>$$\begin{split} \beta(t,u) &#x3D;\beta(t+1,u)\varnothing(t,u) + \alpha(t,u+1)y(t,u) \end{split} \tag{3.3}$$<br>初始化$\beta(T,U)&#x3D;\varnothing(T,U)$</li>
+</ul>
+<h4 id="2-3-2-greedy-decode"><a href="#2-3-2-greedy-decode" class="headerlink" title="2.3.2 greedy decode"></a>2.3.2 greedy decode</h4><ul>
+<li>1)开始设置：$t&#x3D;1, u&#x3D;0, y&#x3D;[]$</li>
+<li>2)用$o$计算$f_t$，用$y$计算$g_u$</li>
+<li>3)计算$h(t,u)$</li>
+<li>4)如果$h(t,u)$ 最大值是$\varnothing, t&#x3D;t+1$ 什么也不输出，继续解码</li>
+<li>&emsp;如果$h(t,u)$ 最大值是一个非$\varnothing$值$A$，$u&#x3D;u+1, y&#x3D;[A]$</li>
+<li>5）t&#x3D;T+1, 技术解码，否则回到步骤2</li>
+</ul>
+<div align="middle"><img src="src/greedy-search.png" style="max-width:80%"></div>
+
+<p>other decoder methed</p>
+<ul>
+<li>Search algorithms:<ul>
+<li>Greedy search constrained to one emission by timestep.</li>
+<li>Default beam search algorithm <a target="_blank" rel="noopener" href="https://arxiv.org/abs/1211.3711">[Graves, 2012]</a> without prefix search.</li>
+<li>Alignment-Length Synchronous decoding <a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/9053040">[Saon et al., 2020]</a>.</li>
+<li>Time Synchronous Decoding <a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/9053040">[Saon et al., 2020]</a>.</li>
+<li>N-step Constrained beam search modified from <a target="_blank" rel="noopener" href="https://arxiv.org/abs/2002.03577">[Kim et al., 2020]</a>.</li>
+<li>modified Adaptive Expansion Search based on <a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/9250505">[Kim et al., 2021]</a> and NSC.</li>
+</ul>
+</li>
+</ul>
+<h4 id="2-3-3-对齐"><a href="#2-3-3-对齐" class="headerlink" title="2.3.3 对齐"></a>2.3.3 对齐</h4><p>给定(O,W), Transducer定义了一系列可能的单调对齐， 例如，当T&#x3D;4, 输出序列是（“CAT”）长度U&#x3D;3</p>
+<div align="middle"><img src="src/transducer-graph.png" style="max-width:60%"></div>
+
+<p>其中一种对齐路径$z &#x3D; \varnothing,C,A,\varnothing,T,\varnothing,\varnothing$</p>
+<div align="middle"><img src="src/cat-align-1.png" style="max-width:60%"></div>
+
+<p>另一种对齐路径$z &#x3D; C,\varnothing,A,\varnothing,T,\varnothing,\varnothing$</p>
+<div align="middle"><img src="src/cat-align-2.png" style="max-width:60%"></div>
+
+<h4 id="2-3-4-FastEmit"><a href="#2-3-4-FastEmit" class="headerlink" title="2.3.4 FastEmit"></a>2.3.4 FastEmit</h4><p>因为RNN-T倾向于延迟输出其预测结果，直到通过获得更多未来帧进而产生更高的confidence之后才输出</p>
+<blockquote>
+<p>FastEmit: Low-Latency Streaming ASR with Sequence-Level Emission Regularization. <a target="_blank" rel="noopener" href="https://arxiv.org/abs/2010.11148">[Yu et al., 2021]</a>.</p>
+</blockquote>
+<div align="middle"><img src="src/fastemit.png" style="max-width:100%"></div>
+<div align="middle"><img src="src/fastemit1.png" style="max-width:60%"></div>
+<div align="middle"><img src="src/fastemit2.png" style="max-width:60%"></div>
+
+<h4 id="2-3-5-内存使用"><a href="#2-3-5-内存使用" class="headerlink" title="2.3.5 内存使用"></a>2.3.5 内存使用</h4><p>&emsp;&emsp;Transducer 是理论上更优的算法，但是普及度较低，主要就是因为训练资源消耗严重，例如$T&#x3D;1000,U&#x3D;100,C&#x3D;1000$个建模单元，$batch&#x3D;32$ 则$h(t,u)$ 的大小为$B×T×U×C&#x3D;3,200,000,000$， float存储的话就是12.8GB，<br>所以训练通常需要大显卡的GPU，或者减小Batch，或者降采样T等措施，k2_ pruned_transducer 也是一种选择</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/02/18/hello-world/" rel="prev" title="Hello World">
+      <i class="fa fa-chevron-left"></i> Hello World
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-Traditional-ASR"><span class="nav-number">1.</span> <span class="nav-text">1. Traditional ASR</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-End-to-End-ASR"><span class="nav-number">2.</span> <span class="nav-text">2. End-to-End ASR</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-LAS"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 LAS</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-CTC"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 CTC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Transducer"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 Transducer</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#2-3-1-transducer-forward-backward"><span class="nav-number">2.3.1.</span> <span class="nav-text">2.3.1 transducer forward-backward</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-3-2-greedy-decode"><span class="nav-number">2.3.2.</span> <span class="nav-text">2.3.2 greedy decode</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-3-3-%E5%AF%B9%E9%BD%90"><span class="nav-number">2.3.3.</span> <span class="nav-text">2.3.3 对齐</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-3-4-FastEmit"><span class="nav-number">2.3.4.</span> <span class="nav-text">2.3.4 FastEmit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-3-5-%E5%86%85%E5%AD%98%E4%BD%BF%E7%94%A8"><span class="nav-number">2.3.5.</span> <span class="nav-text">2.3.5 内存使用</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">2</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
